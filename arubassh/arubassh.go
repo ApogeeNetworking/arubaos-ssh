@@ -79,6 +79,7 @@ func (w *Wlc) GetApDb() ([]AP, error) {
 	}
 	for _, line := range apLines {
 		apList := strings.Split(line, " ")
+		// fmt.Println(apList)
 		ap := AP{
 			Name:   apList[0],
 			Group:  apList[1],
@@ -88,13 +89,13 @@ func (w *Wlc) GetApDb() ([]AP, error) {
 
 		switch ap.Status {
 		case "up":
-			ap.PrimaryWlc = apList[7]
-			ap.MacAddr = apList[9]
-			ap.Serial = apList[10]
-		case "down":
 			ap.PrimaryWlc = apList[6]
 			ap.MacAddr = apList[8]
 			ap.Serial = apList[9]
+		case "down":
+			ap.PrimaryWlc = apList[5]
+			ap.MacAddr = apList[7]
+			ap.Serial = apList[8]
 		}
 		aps = append(aps, ap)
 	}
@@ -143,7 +144,7 @@ type APLldp struct {
 // GetApLLDPInfo ...
 func (w *Wlc) GetApLLDPInfo(apName string) APLldp {
 	re := regexp.MustCompile(`^ap\d+\S+`)
-	cmd := fmt.Sprintf("show ap lldp neighbors ap-name %s", apName)
+	cmd := fmt.Sprintf("show ap lldp neighbors ap-nam %s", apName)
 	out, _ := w.Client.SendCmd(cmd)
 	lines := strings.Split(out, "\n")
 	var apLLDP APLldp

@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
+	"strings"
+	"sync"
 
 	"github.com/drkchiloll/arubaos-ssh/arubassh"
 	"github.com/subosito/gotenv"
@@ -20,38 +21,104 @@ func init() {
 	enablePass = os.Getenv("SSH_ENABLE_PW")
 }
 
-// AP the properties that exist on AccessPoints
-type AP struct {
-	MacAddr      string
-	Name         string
-	Group        string
-	Model        string
-	Serial       string
-	IPAddr       string
-	Status       string
-	PrimaryWlc   string
-	SecondaryWlc string
-}
-
 func main() {
 	wlc := arubassh.New(host, user, pass, enablePass)
 	err := wlc.Client.Connect(10)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
-	defer wlc.Client.Close()
 
-	// aps, _ := wlc.GetApDb()
-	// for _, ap := range aps {
-	// 	fmt.Println(ap)
-	// }
-	// apIntf := wlc.GetApIntfStats("94:b4:0f:c6:d6:1a")
-	// fmt.Println(apIntf)
-	apLLDP := wlc.GetApLLDPInfo("ap01Victory.Laundry.unt.tx")
-	fmt.Println(apLLDP)
+	aps, _ := wlc.GetApDb()
+	wlc.Client.Close()
+
+	conns := spawn()
+	defer release(conns)
+	var wg sync.WaitGroup
+	var mut sync.Mutex
+	sem := make(chan struct{}, 4)
+	var apStatus []ApStatus
+	for _, ap := range aps {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(ap arubassh.AP) {
+			defer wg.Done()
+			apStat := make(chan ApStatus, 1)
+			worker := &ConnPoolWorker{
+				Conns:    conns,
+				Sem:      sem,
+				Ap:       &ap,
+				ApStatus: apStat,
+			}
+			go work(worker)
+			stat := <-worker.ApStatus
+			mut.Lock()
+			apStatus = append(apStatus, stat)
+			mut.Unlock()
+		}(ap)
+	}
+	wg.Wait()
+	for _, s := range apStatus {
+		fmt.Println(s)
+	}
 }
 
-func trimWS(text string) string {
-	tsRe := regexp.MustCompile(`\s+`)
-	return tsRe.ReplaceAllString(text, " ")
+func work(worker *ConnPoolWorker) {
+WorkLoop:
+	for {
+		for i, con := range worker.Conns {
+			if !con.InUse {
+				worker.Conns[i].InUse = true
+				apIntf := con.Awlc.GetApIntfStats(worker.Ap.MacAddr)
+				apLLDP := con.Awlc.GetApLLDPInfo(worker.Ap.Name)
+				worker.ApStatus <- ApStatus{
+					Status:     apIntf.Speed + "-" + strings.ToUpper(apIntf.Duplex),
+					RemoteSw:   apLLDP.RemoteSw,
+					RemoteIntf: apLLDP.RemoteIntf,
+				}
+				<-worker.Sem
+				worker.Conns[i].InUse = false
+				break WorkLoop
+			}
+		}
+	}
+}
+
+// ApStatus ...
+type ApStatus struct {
+	Status     string
+	RemoteSw   string
+	RemoteIntf string
+}
+
+// ConnPoolWorker ...
+type ConnPoolWorker struct {
+	Conns    [4]*ConnPool
+	Ap       *arubassh.AP
+	Sem      chan struct{}
+	ApStatus chan ApStatus
+}
+
+// ConnPool ...
+type ConnPool struct {
+	Awlc  *arubassh.Wlc
+	InUse bool
+}
+
+func spawn() [4]*ConnPool {
+	var conns [4]*ConnPool
+	for i := 0; i < 4; i++ {
+		w := arubassh.New(host, user, pass, enablePass)
+		err := w.Client.Connect(5)
+		if err != nil {
+			log.Fatalf("%v", err)
+		}
+		conns[i] = &ConnPool{Awlc: w}
+	}
+	return conns
+}
+
+func release(conns [4]*ConnPool) {
+	for _, c := range conns {
+		c.Awlc.Client.Close()
+	}
 }
