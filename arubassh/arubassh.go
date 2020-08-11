@@ -115,6 +115,10 @@ type ApIntf struct {
 func (w *Wlc) GetApIntfStats(wiredMac string) ApIntf {
 	cmd := fmt.Sprintf("show ap port status wired-mac %s", wiredMac)
 	out, _ := w.Client.SendCmd(cmd)
+	res := fmt.Sprintf("AP with MAC address %s not found.", wiredMac)
+	if strings.Contains(out, res) {
+		return ApIntf{}
+	}
 	re := regexp.MustCompile(`(\w+:){5}\w+`)
 	lines := strings.Split(out, "\n")
 	contains := strings.Contains

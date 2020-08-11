@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -22,6 +23,29 @@ func init() {
 }
 
 func main() {
+	d, _ := ioutil.ReadFile("aplist2.txt")
+	payload := string(d)
+
+	lines := strings.Split(payload, "\n")
+	wlc := arubassh.New(host, user, pass, enablePass)
+	err := wlc.Client.Connect(10)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
+	defer wlc.Client.Close()
+	for _, line := range lines {
+		apLLDP := wlc.GetApLLDPInfo(line)
+		// apIntf := wlc.GetApIntfStats(line)
+		fmt.Println(apLLDP)
+	}
+}
+
+func normalizeMac(m string) string {
+	return strings.ToLower(m[0:2] + ":" + m[2:4] + ":" + m[4:6] +
+		":" + m[6:8] + ":" + m[8:10] + ":" + m[10:12])
+}
+
+func p() {
 	wlc := arubassh.New(host, user, pass, enablePass)
 	err := wlc.Client.Connect(10)
 	if err != nil {
