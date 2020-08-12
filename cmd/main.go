@@ -23,7 +23,7 @@ func init() {
 }
 
 func main() {
-	d, _ := ioutil.ReadFile("aplist2.txt")
+	d, _ := ioutil.ReadFile("aplist.txt")
 	payload := string(d)
 
 	lines := strings.Split(payload, "\n")
@@ -34,10 +34,21 @@ func main() {
 	}
 	defer wlc.Client.Close()
 	for _, line := range lines {
-		apLLDP := wlc.GetApLLDPInfo(line)
-		// apIntf := wlc.GetApIntfStats(line)
-		fmt.Println(apLLDP)
+		// apLLDP := wlc.GetApLLDPInfo(line)
+		// fmt.Println(apLLDP)
+		apIntf := wlc.GetApIntfStats(line)
+		fmt.Println(apIntf)
 	}
+	// out, _ := wlc.Client.SendCmd("show loginsessions")
+	// ipRE := regexp.MustCompile(`(\d+\.){3}\d+`)
+	// var logins int
+	// lines := strings.Split(out, "\n")
+	// for _, line := range lines {
+	// 	if ipRE.MatchString(line) {
+	// 		logins++
+	// 	}
+	// }
+	// fmt.Println(logins)
 }
 
 func normalizeMac(m string) string {
