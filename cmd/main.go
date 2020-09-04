@@ -2,13 +2,12 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
 	"sync"
 
-	"github.com/drkchiloll/arubaos-ssh/arubassh"
+	"github.com/ApogeeNetworking/arubaos-ssh/arubassh"
 	"github.com/subosito/gotenv"
 )
 
@@ -23,22 +22,26 @@ func init() {
 }
 
 func main() {
-	d, _ := ioutil.ReadFile("aplist.txt")
-	payload := string(d)
+	// d, _ := ioutil.ReadFile("aplist.txt")
+	// payload := string(d)
 
-	lines := strings.Split(payload, "\n")
+	// lines := strings.Split(payload, "\n")
 	wlc := arubassh.New(host, user, pass, enablePass)
 	err := wlc.Client.Connect(10)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
 	defer wlc.Client.Close()
-	for _, line := range lines {
-		// apLLDP := wlc.GetApLLDPInfo(line)
-		// fmt.Println(apLLDP)
-		apIntf := wlc.GetApIntfStats(line)
-		fmt.Println(apIntf)
+	aps, _ := wlc.GetApDb()
+	for _, ap := range aps {
+		fmt.Println(ap)
 	}
+	// for _, line := range lines {
+	// apLLDP := wlc.GetApLLDPInfo(line)
+	// fmt.Println(apLLDP)
+	// 	apIntf := wlc.GetApIntfStats(line)
+	// 	fmt.Println(apIntf)
+	// }
 	// out, _ := wlc.Client.SendCmd("show loginsessions")
 	// ipRE := regexp.MustCompile(`(\d+\.){3}\d+`)
 	// var logins int
