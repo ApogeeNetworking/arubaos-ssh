@@ -1,8 +1,8 @@
-module github.com/ApogeeNetworking/arubaos-ssh
+module github.com/ApogeeNetworking/arubassh
 
-go 1.13
+go 1.15
 
 require (
-	github.com/ApogeeNetworking/gonet v0.1.8
+	github.com/ApogeeNetworking/gonetssh v0.1.3
 	github.com/subosito/gotenv v1.2.0
 )

@@ -5,47 +5,35 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/ApogeeNetworking/gonet"
+	"github.com/ApogeeNetworking/gonetssh"
+	"github.com/ApogeeNetworking/gonetssh/universal"
 )
 
 // Wlc ...
 type Wlc struct {
-	Client *gonet.Gonet
+	Client universal.Device
 }
 
 // New ...
 func New(host, user, pass, enablePass string) *Wlc {
-	return &Wlc{
-		Client: &gonet.Gonet{
-			IP:       host,
-			Username: user,
-			Password: pass,
-			Vendor:   "aruba",
-			Enable:   enablePass,
-		},
-	}
+	cl, _ := gonetssh.NewDevice(host, user, pass, enablePass, gonetssh.DType.Aruba)
+	return &Wlc{Client: cl}
 }
 
 // SetApName ...
 func (w *Wlc) SetApName(wiredMac, newName string) {
 	// Move the Config Terminal Mode
-	w.Client.SendConfig("configure terminal")
 	cmd := fmt.Sprintf("ap-rename wired-mac %s %s", wiredMac, newName)
 	// Set the AP Name using the Wire MAC Address of the AP
-	w.Client.SendConfig(cmd)
-	// Exit Config Mode
-	w.Client.SendConfig("exit")
+	w.Client.SendCmd(cmd)
 }
 
 // SetApGroup ...
 func (w *Wlc) SetApGroup(wiredMac, newGroup string) {
 	// Move the Config Terminal Mode
-	w.Client.SendConfig("configure terminal")
 	cmd := fmt.Sprintf("ap-regroup wired-mac %s %s", wiredMac, newGroup)
 	// Set the AP Name using the Wire MAC Address of the AP
-	w.Client.SendConfig(cmd)
-	// Exit Config Mode
-	w.Client.SendConfig("exit")
+	w.Client.SendCmd(cmd)
 }
 
 // AP the properties that exist on AccessPoints
@@ -69,34 +57,30 @@ func (w *Wlc) GetApDb() ([]AP, error) {
 		return aps, err
 	}
 	lines := strings.Split(out, "\n")
-	re := regexp.MustCompile(`^ap\d+\S+|^(\w+:){5}\w+`)
+	apNameRe := regexp.MustCompile(`^ap\d+\S+|^(\w+:){5}\w+`)
+	serialRe := regexp.MustCompile(`(\w+){7,15}`)
+	macRe := regexp.MustCompile(`(\w+:){5}\w+`)
+	wlcIPRe := regexp.MustCompile(`(\d+\.){3}\d+`)
 	var apLines []string
 	for _, line := range lines {
-		if re.MatchString(line) {
+		if apNameRe.MatchString(line) {
 			line = trimWS(line)
 			apLines = append(apLines, line)
 		}
 	}
 	for _, line := range apLines {
 		apList := strings.Split(line, " ")
-		// fmt.Println(apList)
 		ap := AP{
 			Name:   apList[0],
 			Group:  apList[1],
 			Model:  apList[2],
 			Status: strings.ToLower(apList[4]),
 		}
-
-		switch ap.Status {
-		case "up":
-			ap.PrimaryWlc = apList[6]
-			ap.MacAddr = apList[8]
-			ap.Serial = apList[9]
-		case "down":
-			ap.PrimaryWlc = apList[5]
-			ap.MacAddr = apList[7]
-			ap.Serial = apList[8]
-		}
+		ap.MacAddr = macRe.FindString(line)
+		serialStr := strings.Join(apList[7:], " ")
+		priWlcStr := strings.Join(apList[5:8], " ")
+		ap.Serial = serialRe.FindString(serialStr)
+		ap.PrimaryWlc = wlcIPRe.FindString(priWlcStr)
 		aps = append(aps, ap)
 	}
 	return aps, nil

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ApogeeNetworking/arubaos-ssh/arubassh"
+	"github.com/ApogeeNetworking/arubassh"
 	"github.com/subosito/gotenv"
 )
 
@@ -31,7 +31,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
-	defer wlc.Client.Close()
+	defer wlc.Client.Disconnect()
 	aps, _ := wlc.GetApDb()
 	for _, ap := range aps {
 		fmt.Println(ap)
@@ -67,7 +67,7 @@ func p() {
 	}
 
 	aps, _ := wlc.GetApDb()
-	wlc.Client.Close()
+	wlc.Client.Disconnect()
 
 	conns := spawn()
 	defer release(conns)
@@ -157,6 +157,6 @@ func spawn() [4]*ConnPool {
 
 func release(conns [4]*ConnPool) {
 	for _, c := range conns {
-		c.Awlc.Client.Close()
+		c.Awlc.Client.Disconnect()
 	}
 }
