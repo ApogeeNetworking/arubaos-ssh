@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -22,36 +23,21 @@ func init() {
 }
 
 func main() {
-	// d, _ := ioutil.ReadFile("aplist.txt")
-	// payload := string(d)
-
-	// lines := strings.Split(payload, "\n")
 	wlc := arubassh.New(host, user, pass, enablePass)
 	err := wlc.Client.Connect(10)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
 	defer wlc.Client.Disconnect()
-	aps, _ := wlc.GetApDb()
-	for _, ap := range aps {
-		fmt.Println(ap)
+	clients := wlc.GetWirelessClients()
+	for _, client := range clients {
+		fmt.Println(client.ApName + "somethingelse")
 	}
-	// for _, line := range lines {
-	// apLLDP := wlc.GetApLLDPInfo(line)
-	// fmt.Println(apLLDP)
-	// 	apIntf := wlc.GetApIntfStats(line)
-	// 	fmt.Println(apIntf)
-	// }
-	// out, _ := wlc.Client.SendCmd("show loginsessions")
-	// ipRE := regexp.MustCompile(`(\d+\.){3}\d+`)
-	// var logins int
-	// lines := strings.Split(out, "\n")
-	// for _, line := range lines {
-	// 	if ipRE.MatchString(line) {
-	// 		logins++
-	// 	}
-	// }
-	// fmt.Println(logins)
+}
+
+func trimWS(text string) string {
+	tsRe := regexp.MustCompile(`\s+`)
+	return tsRe.ReplaceAllString(text, " ")
 }
 
 func normalizeMac(m string) string {
