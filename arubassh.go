@@ -149,6 +149,66 @@ func (w *Wlc) GetApLLDPInfo(apName string) APLldp {
 	return apLLDP
 }
 
+// WirelessClient ...
+type WirelessClient struct {
+	IPAddr     string
+	ApName     string
+	Auth       string
+	BSSID      string
+	SSID       string
+	MacAddr    string
+	DeviceType string
+}
+
+// GetWirelessClients ...
+func (w *Wlc) GetWirelessClients() []WirelessClient {
+	var clients []WirelessClient
+	out, _ := w.Client.SendCmd("show user-table")
+	ipRe := regexp.MustCompile(`(\d+\.){3}\d+`)
+	lines := strings.Split(out, "\n")
+	for _, line := range lines {
+		if ipRe.MatchString(line) {
+			ip := ipRe.FindString(line)
+			line = trimWS(line)
+			clSplit := strings.Split(line, " ")
+			client := WirelessClient{
+				ApName:  clSplit[4],
+				IPAddr:  ip,
+				MacAddr: clSplit[1],
+			}
+			// Front [SSID/... to DeviceType]
+			endArr := clSplit[6:]
+			endJoin := strings.Join(endArr, " ")
+			ssidRe := regexp.MustCompile(`(.*/){2}\S+`)
+			// WhiteSpace in SSID
+			ssidWsRe := regexp.MustCompile(`(\w+\s\w+)/`)
+			ssidStr := ssidRe.FindString(endJoin)
+			if ssidStr != "" {
+				ssidSplit := strings.Split(ssidStr, "/")
+				client.SSID = ssidSplit[0]
+				client.BSSID = ssidSplit[1]
+			}
+			switch {
+			// DeviceTypes do not have Spaces within them
+			case len(endArr) == 5 && !ssidWsRe.MatchString(endJoin):
+				client.DeviceType = endArr[3]
+			// DeviceType's Are [OS X | Window x] (multi-spaced DeviceType)
+			case len(endArr) == 6 && !ssidWsRe.MatchString(endJoin):
+				client.DeviceType = endArr[3] + " " + endArr[4]
+			case len(endArr) == 6 && ssidWsRe.MatchString(endJoin):
+				client.DeviceType = endArr[5]
+			// DeviceType's are OS X | Windows x && SSID with WhiteSpace
+			case len(endArr) == 7 && ssidWsRe.MatchString(endJoin):
+				client.DeviceType = endArr[4] + " " + endArr[5]
+			default:
+				// fmt.Println(endArr)
+			}
+			clients = append(clients, client)
+		}
+	}
+	return clients
+}
+
 func trimWS(text string) string {
 	tsRe := regexp.MustCompile(`\s+`)
 	return tsRe.ReplaceAllString(text, " ")
