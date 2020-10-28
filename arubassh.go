@@ -108,8 +108,14 @@ func (w *Wlc) GetApIntfStats(wiredMac string) ApIntf {
 	contains := strings.Contains
 	for _, line := range lines {
 		line = trimWS(line)
-		if re.MatchString(line) && !contains(line, cmd) && !contains(line, "down") {
+		if re.MatchString(line) &&
+			!contains(line, "show") &&
+			!contains(line, "wired-mac") &&
+			!contains(line, "down") {
 			intfSplit := strings.Split(line, " ")
+			if len(intfSplit) < 18 {
+				continue
+			}
 			apIntf := ApIntf{
 				Status: intfSplit[5],
 				Speed:  intfSplit[6] + " " + intfSplit[7],
