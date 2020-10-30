@@ -146,6 +146,9 @@ func (w *Wlc) GetApLLDPInfo(apName string) APLldp {
 		if re.MatchString(line) {
 			line = trimWS(line)
 			lldpSplit := strings.Split(line, " ")
+			if len(lldpSplit) < 5 {
+				return apLLDP
+			}
 			apLLDP = APLldp{
 				RemoteSw:   lldpSplit[3],
 				RemoteIntf: lldpSplit[4],
