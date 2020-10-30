@@ -9,6 +9,8 @@ import (
 	"github.com/ApogeeNetworking/gonetssh/universal"
 )
 
+var contains = strings.Contains
+
 // Wlc ...
 type Wlc struct {
 	Client universal.Device
@@ -95,17 +97,35 @@ type ApIntf struct {
 	Rcv    string
 }
 
-// GetApIntfStats ...
-func (w *Wlc) GetApIntfStats(wiredMac string) ApIntf {
-	cmd := fmt.Sprintf("show ap port status wired-mac %s", wiredMac)
-	out, _ := w.Client.SendCmd(cmd)
-	res := fmt.Sprintf("AP with MAC address %s not found.", wiredMac)
-	if strings.Contains(out, res) {
-		return ApIntf{}
+// ApIntfParams ...
+type ApIntfParams struct {
+	MacAddr string
+	ApName  string
+}
+
+// GetApIntf ...
+func (w *Wlc) GetApIntf(p ApIntfParams) ApIntf {
+	var apIntf ApIntf
+	var cmd string
+	switch {
+	case p.MacAddr != "":
+		cmd = fmt.Sprintf("show ap port status wired-mac %s", p.MacAddr)
+	case p.ApName != "":
+		cmd = fmt.Sprintf("show ap port status ap-name %s", p.ApName)
 	}
+	out, _ := w.Client.SendCmd(cmd)
+	if p.MacAddr != "" {
+		res := fmt.Sprintf("AP with MAC address %s not found.", p.MacAddr)
+		if contains(out, res) {
+			return apIntf
+		}
+	}
+	if contains(out, "No information available for this AP") {
+		return apIntf
+	}
+	// MAC Address Regular Expression
 	re := regexp.MustCompile(`(\w+:){5}\w+`)
 	lines := strings.Split(out, "\n")
-	contains := strings.Contains
 	for _, line := range lines {
 		line = trimWS(line)
 		if re.MatchString(line) &&
@@ -116,17 +136,17 @@ func (w *Wlc) GetApIntfStats(wiredMac string) ApIntf {
 			if len(intfSplit) < 18 {
 				continue
 			}
-			apIntf := ApIntf{
+			apIntf = ApIntf{
 				Status: intfSplit[5],
 				Speed:  intfSplit[6] + " " + intfSplit[7],
 				Duplex: intfSplit[8],
 				Tx:     intfSplit[15],
 				Rcv:    intfSplit[17],
 			}
-			return apIntf
+			break
 		}
 	}
-	return ApIntf{}
+	return apIntf
 }
 
 // APLldp the properties of a Neighbor Connected to the AP
@@ -137,11 +157,14 @@ type APLldp struct {
 
 // GetApLLDPInfo ...
 func (w *Wlc) GetApLLDPInfo(apName string) APLldp {
+	var apLLDP APLldp
 	re := regexp.MustCompile(`^ap\d+\S+`)
 	cmd := fmt.Sprintf("show ap lldp neighbors ap-nam %s", apName)
 	out, _ := w.Client.SendCmd(cmd)
+	if strings.Contains(out, "AP is down") {
+		return apLLDP
+	}
 	lines := strings.Split(out, "\n")
-	var apLLDP APLldp
 	for _, line := range lines {
 		if re.MatchString(line) {
 			line = trimWS(line)
