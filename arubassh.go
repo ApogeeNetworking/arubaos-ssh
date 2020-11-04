@@ -3,6 +3,7 @@ package arubassh
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/ApogeeNetworking/gonetssh"
@@ -190,6 +191,9 @@ type WirelessClient struct {
 	SSID       string
 	MacAddr    string
 	DeviceType string
+	Channel    int
+	TxBytes    int64
+	RcvBytes   int64
 }
 
 // GetWirelessClients ...
@@ -232,13 +236,47 @@ func (w *Wlc) GetWirelessClients() []WirelessClient {
 			// DeviceType's are OS X | Windows x && SSID with WhiteSpace
 			case len(endArr) == 7 && ssidWsRe.MatchString(endJoin):
 				client.DeviceType = endArr[4] + " " + endArr[5]
-			default:
-				// fmt.Println(endArr)
+			}
+			if client.DeviceType == "" {
+				client.DeviceType = "Unknown"
 			}
 			clients = append(clients, client)
 		}
 	}
 	return clients
+}
+
+// GetClientDetails ...
+func (w *Wlc) GetClientDetails(client *WirelessClient) WirelessClient {
+	var channel int
+	var tx, rcv int64
+	cmd := fmt.Sprintf("sh ap association client-mac %s | beg Parameter", client.MacAddr)
+	out, _ := w.Client.SendCmd(cmd)
+	chanRe := regexp.MustCompile(`Channel\s+(\d+)`)
+	txRe := regexp.MustCompile(`Client\sTx\sBytes\s+(\d+)`)
+	rcvRe := regexp.MustCompile(`Client\sRx\sBytes\s+(\d+)`)
+	if chanRe.MatchString(out) {
+		chMatch := chanRe.FindStringSubmatch(out)
+		if len(chMatch) == 2 {
+			channel, _ = strconv.Atoi(chMatch[1])
+			client.Channel = channel
+		}
+	}
+	if txRe.MatchString(out) {
+		txMatch := txRe.FindStringSubmatch(out)
+		if len(txMatch) == 2 {
+			tx, _ = strconv.ParseInt(txMatch[1], 10, 64)
+			client.TxBytes = tx
+		}
+	}
+	if rcvRe.MatchString(out) {
+		rxMatch := rcvRe.FindStringSubmatch(out)
+		if len(rxMatch) == 2 {
+			rcv, _ = strconv.ParseInt(rxMatch[1], 10, 64)
+			client.RcvBytes = rcv
+		}
+	}
+	return *client
 }
 
 func trimWS(text string) string {
