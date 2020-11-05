@@ -14,13 +14,24 @@ var contains = strings.Contains
 
 // Wlc ...
 type Wlc struct {
-	Client universal.Device
+	version string
+	Client  universal.Device
 }
 
 // New ...
-func New(host, user, pass, enablePass string) *Wlc {
-	cl, _ := gonetssh.NewDevice(host, user, pass, enablePass, gonetssh.DType.Aruba)
-	return &Wlc{Client: cl}
+func New(host, user, pass, enablePass, version string) *Wlc {
+	var dtype gonetssh.DeviceType
+	switch version {
+	case "6":
+		dtype = gonetssh.DType.Aruba6
+	case "8":
+		dtype = gonetssh.DType.Aruba8
+	}
+	cl, _ := gonetssh.NewDevice(host, user, pass, enablePass, dtype)
+	return &Wlc{
+		Client:  cl,
+		version: version,
+	}
 }
 
 // SetApName ...
@@ -277,6 +288,53 @@ func (w *Wlc) GetClientDetails(client *WirelessClient) WirelessClient {
 		}
 	}
 	return *client
+}
+
+// GetClientCountBySSID ...
+func (w *Wlc) GetClientCountBySSID(ssid string) int {
+	var count int
+	countRe := regexp.MustCompile(`User\sEntries:\s(\d+)`)
+	cmd := fmt.Sprintf("show user-table essid \"%s\" | include \"User Entries\"", ssid)
+	out, _ := w.Client.SendCmd(cmd)
+	if countRe.MatchString(out) {
+		countMatch := countRe.FindStringSubmatch(out)
+		count, _ = strconv.Atoi(countMatch[1])
+	}
+	return count
+}
+
+// GetSSIDs ...
+func (w *Wlc) GetSSIDs() []string {
+	var ssids []string
+	var cmd string
+	switch {
+	case w.version == "6":
+		cmd = "show configuration | include essid"
+	case w.version == "8":
+		cmd = "show configuration effective | include essid"
+	}
+	out, _ := w.Client.SendCmd(cmd)
+	lines := strings.Split(out, "\n")
+	ssidRe := regexp.MustCompile(`\s+essid\s\"(.*)\"`)
+	for _, line := range lines {
+		if ssidRe.MatchString(line) {
+			matches := ssidRe.FindStringSubmatch(line)
+			if len(matches) == 2 {
+				var ssidMatch bool
+				ssid := matches[1]
+				for _, id := range ssids {
+					if id == ssid {
+						ssidMatch = true
+						break
+					}
+				}
+				if !ssidMatch {
+					ssids = append(ssids, ssid)
+				}
+			}
+		}
+	}
+	return ssids
 }
 
 func trimWS(text string) string {
