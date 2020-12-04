@@ -71,7 +71,7 @@ func (w *Wlc) GetApDb() ([]AP, error) {
 		return aps, err
 	}
 	lines := strings.Split(out, "\n")
-	apNameRe := regexp.MustCompile(`^ap\d+\S+|^(\w+:){5}\w+`)
+	apNameRe := regexp.MustCompile(`^ap\d+\S+|^(\w+:){5}\w+|^ap\d+\s+`)
 	serialRe := regexp.MustCompile(`(\w+){7,15}`)
 	macRe := regexp.MustCompile(`(\w+:){5}\w+`)
 	wlcIPRe := regexp.MustCompile(`(\d+\.){3}\d+`)
@@ -88,6 +88,7 @@ func (w *Wlc) GetApDb() ([]AP, error) {
 			Name:   apList[0],
 			Group:  apList[1],
 			Model:  apList[2],
+			IPAddr: apList[3],
 			Status: strings.ToLower(apList[4]),
 		}
 		ap.MacAddr = macRe.FindString(line)
@@ -335,6 +336,48 @@ func (w *Wlc) GetSSIDs() []string {
 		}
 	}
 	return ssids
+}
+
+// ControllerLicense ...
+type ControllerLicense struct {
+	Expires     string `json:"Expires(Grace period expiry)"`
+	Installed   string `json:"Installed"`
+	Key         string `json:"Key"`
+	ServiceType string `json:"Service Type"`
+	Status      string
+}
+
+// GetLicenses ...
+func (w *Wlc) GetLicenses() []ControllerLicense {
+	out, _ := w.Client.SendCmd("show license")
+	lines := strings.Split(out, "\n")
+	keyRe := regexp.MustCompile(`(\S+-){5}\w+`)
+	var licenses []ControllerLicense
+	for _, line := range lines {
+		if !keyRe.MatchString(line) {
+			continue
+		}
+		line = trimWS(line)
+		keySplit := strings.Split(line, " ")
+		license := ControllerLicense{
+			Key:       keySplit[0],
+			Installed: keySplit[1],
+		}
+		switch {
+		case keySplit[2] == "Expired":
+			license.Status = keySplit[2]
+			license.ServiceType = fmt.Sprintf(
+				"%s %s %s", keySplit[3], keySplit[4], keySplit[5],
+			)
+		default:
+			license.Status = "Enabled"
+			license.ServiceType = fmt.Sprintf(
+				"%s %s %s", keySplit[4], keySplit[5], keySplit[6],
+			)
+		}
+		licenses = append(licenses, license)
+	}
+	return licenses
 }
 
 func trimWS(text string) string {
