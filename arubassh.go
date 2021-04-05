@@ -292,15 +292,19 @@ func (w *Wlc) GetClientDetails(client *WirelessClient) WirelessClient {
 }
 
 // GetClientCountBySSID ...
-func (w *Wlc) GetClientCountBySSID(ssid string) int {
-	w.Client.SendCmd("")
+func (w *Wlc) GetClientCountBySSID(ssid string, retries int) int {
 	var count int
 	countRe := regexp.MustCompile(`User\sEntries:\s(\d+)`)
-	cmd := fmt.Sprintf("show user-table essid \"%s\"", ssid)
+	cmd := fmt.Sprintf("show user-table essid \"%s\" | include \"User Entries\"", ssid)
 	out, _ := w.Client.SendCmd(cmd)
 	if countRe.MatchString(out) {
 		countMatch := countRe.FindStringSubmatch(out)
 		count, _ = strconv.Atoi(countMatch[1])
+	}
+	if w.version == "8" && count == 0 && retries > 0 {
+		fmt.Println(retries)
+		r := retries - 1
+		return w.GetClientCountBySSID(ssid, r)
 	}
 	return count
 }
