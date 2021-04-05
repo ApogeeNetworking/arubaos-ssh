@@ -293,9 +293,10 @@ func (w *Wlc) GetClientDetails(client *WirelessClient) WirelessClient {
 
 // GetClientCountBySSID ...
 func (w *Wlc) GetClientCountBySSID(ssid string) int {
+	w.Client.SendCmd("")
 	var count int
 	countRe := regexp.MustCompile(`User\sEntries:\s(\d+)`)
-	cmd := fmt.Sprintf("show user-table essid \"%s\" | include \"User Entries\"", ssid)
+	cmd := fmt.Sprintf("show user-table essid \"%s\"", ssid)
 	out, _ := w.Client.SendCmd(cmd)
 	if countRe.MatchString(out) {
 		countMatch := countRe.FindStringSubmatch(out)
